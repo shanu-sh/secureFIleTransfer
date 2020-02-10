@@ -9,6 +9,7 @@
 #include<time.h>
 #include<algorithm>
 #include<unistd.h>
+#include<fstream>
 
 using namespace std;
 
@@ -214,13 +215,13 @@ char* encryption(char data[])
 	}
 
 	DES_ede3_cbc_encrypt((const unsigned char*)data,(unsigned char*)cipher,stringLen, &ks1, &ks2, &ks3,&cblock, DES_ENCRYPT);
-	printf("Encrypted : %32.32s\n",cipher);
+	// printf("Encrypted : %32.32s\n",cipher);
 
 	memset(cblock,0,sizeof(DES_cblock));
 	DES_set_odd_parity(&cblock);
 
 	DES_ede3_cbc_encrypt((const unsigned char*)cipher,(unsigned char*)text,1024, &ks1, &ks2, &ks3,&cblock,DES_DECRYPT);
-	printf("Decrypted : %s\n",text);
+	// printf("Decrypted : %s\n",text);
 
 	return cipher;
 }
@@ -260,13 +261,57 @@ void filetransfer(Msg msg,int cfd)
 	strcpy(filename,msg.reqserv.filename);
 
 	cout<<"Filename is "<<filename<<"\n";
-	char *str=encryption("Hello world");
 
-	cout<<"Encrypted message is "<<str<<"\n";
-	msg.hdr.opcode=30;
-	strcpy(msg.encmsg.encodedmessage,str);
-	//msg.encmsg.encodedmessage=str;
-	send(cfd,(Msg*)&msg,sizeof(msg),0);
+	if(access(filename,F_OK)!=-1)
+    {
+        cout<<"File present\n";
+        FILE *fp;
+        fp=fopen(filename,"r");
+        fseek(fp,0,SEEK_END);
+        long size=ftell(fp);
+        cout<<size;
+        rewind(fp);
+
+        int buffsize=1024;
+        char chunk[buffsize];
+        long n;
+
+        //sending filesize
+        char *s=encryption((char*)to_string(size).c_str());
+        msg.hdr.opcode=30;
+		strcpy(msg.encmsg.encodedmessage,s);
+		send(cfd,(Msg*)&msg,sizeof(msg),0);
+        long chunksize=0;
+
+        while((n=fread(chunk,sizeof(char),buffsize,fp))>0 && size > 0 )
+        {
+            
+            size = size - n;
+            char *str=encryption(chunk);
+            
+            msg.hdr.opcode=30;
+   //          memset(msg.encmsg.encodedmessage,'\0',buffsize);
+			// strcpy(msg.encmsg.encodedmessage,str);
+			// send(cfd,(Msg*)&msg,sizeof(msg),0);
+
+			send(cfd,(char*)str,n,0);
+            
+            cout<<n<<" sizeof "<<sizeof(chunk)<<" len is "<<strlen(chunk)<<"\n";
+            memset(chunk,'\0',buffsize);
+        }
+        
+    }
+    else
+    {
+        cout<<"file not present\n";
+    }
+
+	// char *str=encryption("Hello world");
+
+	// cout<<"Encrypted message is "<<str<<"\n";
+	// msg.hdr.opcode=30;
+	// strcpy(msg.encmsg.encodedmessage,str);
+	// send(cfd,(Msg*)&msg,sizeof(msg),0);
 
 	terminateconnection(cfd);
 }

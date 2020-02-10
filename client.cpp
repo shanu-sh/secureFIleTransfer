@@ -213,6 +213,7 @@ char* decryption(char data[])
 
 	DES_ede3_cbc_encrypt((const unsigned char*)data,(unsigned char*)text,1024, &ks1, &ks2, &ks3,&cblock,DES_DECRYPT);
 	printf("Decrypted : %s\n",text);
+	return text;
 
 }
 
@@ -244,18 +245,59 @@ void filetransfer(int sockid)
 	strcpy(msg.reqserv.filename,filename);
 	send(sockid,(Msg*)&msg,sizeof(msg),0);
 
-	//Reveive the file from server
+	//Reveive the file size from server
+	memset(msg.encmsg.encodedmessage,'\0',1024);
 	recv(sockid,(Msg*)&msg,sizeof(msg),0);
 	cout<<msg.encmsg.encodedmessage<<"Hoorah\n";
+	char * text=decryption(msg.encmsg.encodedmessage);
 
-	decryption(msg.encmsg.encodedmessage);
+	int size=stoi(string(text));
+	cout<<size;
+
+	//Recieve the file from server
+
+	int n;
+
+	FILE *fp;
+	fp=fopen("temp.txt","w");
+
+	int buffsize=1024;
+    char chunk[buffsize];
+
+	
+		// memset(msg.encmsg.encodedmessage,'\0',1024);
+		// recv(sockid,(Msg*)&msg,sizeof(msg),0);
+		// if(msg.hdr.opcode==40)
+		// {
+		// 	cout<<"FIle transfer successfull\n";
+		// 	terminateconnection(sockid);
+		// 	break;
+		// }
+		// else
+		// {
+    
+    while(size>0&&(n=recv(sockid,(char*)&chunk,sizeof(chunk),0))>0)
+    {
+		// text=decryption(msg.encmsg.encodedmessage);
+		text=decryption(chunk);
+		cout<<text<<"\n";
+
+		fwrite(text,sizeof(char),1024,fp);
+		// memset(msg.encmsg.encodedmessage,'\0',1024);
+		size=size-n;
+		memset(chunk,'\0',1024);
+
+		// }
+	}
 
 	recv(sockid,(Msg*)&msg,sizeof(msg),0);
-	if(msg.hdr.opcode==40)
-	{
-		cout<<"FIle transfer successfull\n";
+	
+		cout<<msg.hdr.opcode<<"\n";
 		terminateconnection(sockid);
-	}
+	
+	fclose(fp);
+	//Recieverequest for terminati
+	
 }
 
 void dhkeyexchange(int sockid)
